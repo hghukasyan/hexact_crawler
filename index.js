@@ -7,43 +7,37 @@
  * @return
  *  Array links and total count (in console)
  */
-const cheerio = require('cheerio')
 const args = require("yargs").argv
 const got = require('got')
 const validUrl = require('valid-url')
 const url = require('url')
+const { linksExtract } = require('./utils')
 
 if (!validUrl.isUri(args.url)){
     console.log('Please input url')
     return
 }
 
-const arg = new URL(args.url);
-const links = []
-const debug = true
+const params = {
+    arg : new URL(args.url),
+    links : new Set,
+    debug : true,
+    maxThreads: 5,
+    threads: 0,
+    queue : new Set,
+    timeout: 1000
+}
 
 const crawler = async (url) => {
     try {
         const result = await got(url)
-        const $ = cheerio.load(result.body)
-        const data = []
-        $('a').each((index, element) => {
-            data.push($(element).attr('href'))
-        })
+        const data = linksExtract(result.body, params.arg.origin)
 
-        if(debug === true) {
+        if(params.debug === true) {
             console.log(`Fetching page: ${url}`)
         }
 
-        for(let link of data) {
-            link = urlPretty(link)
-            if(!links.includes(link)) { // if need can exclude external links match(arg.host)
-               links.push(link)
-               if(link.match(arg.host) && !link.match('#')) { // check only origin url and exclude anchors
-                   await crawler(link)
-               }
-            }
-        }
+        console.log(data)
 
         return true
     } catch (error) {
@@ -51,26 +45,16 @@ const crawler = async (url) => {
     }
 }
 
-const urlPretty = (url) => {
-    if(!url.match('//')) {
-        if(url.charAt(0) === '/') {
-            url = url.slice(1)
-        }
-        url = `${arg.origin}/${url}`
-    }
-    if(url.slice(-1) === '/') {
-        url = url.slice(0, -1)
-    }
-
-    return url
-}
-
 (async () => {
     // start crawler
-    links.push(urlPretty(arg.origin))
-    await crawler(arg.origin)
+    await crawler(params.arg.origin)
 
     // output
-    console.log(links)
-    console.log(`Total links count: ${links.length}`)
+    console.log(params.links)
+    console.log(`Total links count: ${params.links.length}`)
 })()
+
+// queue
+const queue = setInterval(function() {
+    console.log(params.queue)
+}, params.timeout);
