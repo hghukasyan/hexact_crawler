@@ -5,10 +5,15 @@
  * @return {Object} url
  */
 const urlPretty = (url, origin) => {
-    const type = url.substr(0, 4) === 'href' ? 'link' : 'image'
-    url = url.slice(0, -1)
-    url = url.slice(type === 'link' ? 6 : 5)
-
+    const type = typeof url[3] === 'undefined' ? 'link' : 'image'
+    let exclude = false
+    url =  type === 'link' ? url[5] : url[3]
+    for(let e of ['data:image','#','mailto:']) {
+        if(url.match(e)) {
+            exclude = true
+            break
+        }
+    }
     if(!url.match('//')) {
         if(url.charAt(0) === '/') {
             url = url.slice(1)
@@ -21,8 +26,9 @@ const urlPretty = (url, origin) => {
 
     return {
         url,
-        status: 0,
-        type
+        type,
+        exclude,
+        internal: url.match(origin) && type === 'link' ? 1 : 0
     }
 }
 
@@ -34,9 +40,13 @@ const urlPretty = (url, origin) => {
  * @return {Array} urls
  */
 const linksExtract = (data, ...attr) => {
-    const urls = new Set()
-    for (url of data.matchAll(/(src="(.*?)"|href="(.*?)")/g)) {
-        urls.add(urlPretty(url[1], attr[0]))
+    const urls = []
+    let type
+    for (url of data.matchAll(/(<img(.*?)src="(.*?)"|<a(.*?)href="(.*?)")/g)) {
+        url = urlPretty(url, attr[0])
+        if(url.exclude === false) {
+            urls[url.url] = [url.type, 0, url.internal]
+        }
     }
 
     return urls
